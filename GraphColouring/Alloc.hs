@@ -11,20 +11,23 @@ import Examples
 -- Part I
 --
 count :: Eq a => a -> [a] -> Int
-count 
-  = undefined
+count x list
+  =  length $ filter (x ==) list
 
 degrees :: Eq a => Graph a -> [(a, Int)]
-degrees 
-  = undefined
+degrees (nodes, edges)
+  = [(n, count n connections + count n connections') | n <- nodes ]
+  where 
+    connections = map fst edges
+    connections'= map snd edges
 
 neighbours :: Eq a => a -> Graph a -> [a]
-neighbours 
-  = undefined
+neighbours node (nodes, edges)
+  = [e | (e, e') <- edges, e' == node] ++ [e' | (e, e') <-edges, e == node]
 
 removeNode :: Eq a => a -> Graph a -> Graph a
-removeNode 
-  = undefined
+removeNode rnode (nodes, edges)
+  = (filter (rnode /=) nodes, [edge | edge@(e, e') <- edges, e /= rnode && e' /= rnode])
 
 ------------------------------------------------------
 --
