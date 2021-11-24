@@ -34,10 +34,20 @@ removeNode rnode (nodes, edges)
 -- Part II
 --
 colourGraph :: (Ord a, Show a) => Int -> Graph a -> Colouring a
-colourGraph 
-  = undefined
+colourGraph _ ([],_) 
+  = []
+colourGraph numCol g 
+  | null unusedC  = (n, 0) : cMap     --0 Stands for not colouring
+  | otherwise     = (n, minimum unusedC) : cMap 
+  where
+    n             = (snd . minimum) [(j,i) | (i,j) <- degrees g]
+    g'            = removeNode n g
+    cMap          = colourGraph numCol g'
+    usedC         = [lookUp neighbour cMap | neighbour <- neighbours n g]
+    unusedC       = [1..numCol] \\ usedC
 
-------------------------------------------------------
+
+  ------------------------------------------------------
 --
 -- Part III
 --
