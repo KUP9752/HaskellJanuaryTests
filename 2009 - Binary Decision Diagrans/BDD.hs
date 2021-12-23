@@ -17,28 +17,93 @@ type BDD = (NodeId, [BDDNode])
 -- PART I
 
 -- Pre: The item is in the given table
+-- because of the precondition no need to check for value not appearing
 lookUp :: Eq a => a -> [(a, b)] -> b
-lookUp 
-  = undefined
+lookUp val dict
+  = head [y | (x, y) <- dict, x == val]
 
 checkSat :: BDD -> Env -> Bool
-checkSat 
-  = undefined
+checkSat (start, tree) env
+  = checkSatHelper start 
+  where 
+    checkSatHelper 0      = False
+    checkSatHelper 1      = True
+    checkSatHelper i
+      |currentVal == True = checkSatHelper tBranch 
+      |otherwise          = checkSatHelper fBranch
+        where
+        (currentVar, fBranch, tBranch) = lookUp i tree
+        currentVal = lookUp currentVar env
 
 sat :: BDD -> [[(Index, Bool)]]
-sat 
-  = undefined
+sat (start, tree)
 
+  = satHelper start
+  where
+    satHelper :: Index -> [[(Index, Bool)]]
+    satHelper 0      = []
+    satHelper 1      = [[]]
+    satHelper i      = map satHelper [fBranch, rBranch]
+      where
+        (currentVar, fBranch, tBranch) = lookUp i tree
+        
+varFinder :: BDD -> [Index]
+varFinder (start, tree)
+  = varHelper start []
+  where
+    varHelper :: NodeId -> [Index] -> [Index]
+    varHelper i is
+      |fBranch == 0 || fBranch == 1 = currentVar : is
+      |otherwise                    = currentVar : varHelper fBranch is
+        where
+          (currentVar, fBranch, _) = lookUp i tree
+          
+  
+  
+  
+layerCounter :: BDD -> Int 
+layerCounter (start, tree) 
+  = layerCounterHelper start 0
+  where
+    layerCounterHelper i n
+      |fBranch == 0 || fBranch == 1 = n + 1
+      |otherwise                    = layerCounterHelper fBranch (n + 1)
+        where
+          (currentVar, fBranch, tBranch) = lookUp i tree
 ------------------------------------------------------
 -- PART II
 
 simplify :: BExp -> BExp
-simplify 
-  = undefined
+simplify exp@(Not bexp)
+  |bexp == Prim False      = Prim True
+  |bexp == Prim True       = Prim False
+  |otherwise               = exp
+simplify exp@(Or bexp bexp')
+  |bexp == Prim True ||  bexp' == Prim True    = Prim True
+  |bexp == Prim False && bexp' == Prim False   = Prim False
+  |otherwise                                   = exp
+simplify exp@(And bexp bexp')
+  |bexp == Prim False && bexp' == Prim False                    = Prim False
+  |bexp == Prim True && bexp' == Prim True                      = Prim True
+  |otherwise                                                    = exp
+
+
 
 restrict :: BExp -> Index -> Bool -> BExp
-restrict 
-  = undefined
+restrict exp n bval
+  = restrictHelper exp
+  where
+    restrictHelper (Not bexp) 
+      = simplify $ Not (restrictHelper bexp)
+    restrictHelper (Or bexp bexp')
+      = simplify $ Or (restrictHelper bexp) (restrictHelper bexp')
+    restrictHelper (And bexp bexp')
+      = simplify $ And (restrictHelper bexp) (restrictHelper bexp')
+    restrictHelper (IdRef i) 
+      |n == i    = Prim bval
+      |otherwise = IdRef i
+    restrictHelper (Prim bool)
+      = Prim bool
 
 ------------------------------------------------------
 -- PART III
@@ -48,14 +113,24 @@ restrict
 -- The question suggests the following definition (in terms of buildBDD')
 -- but you are free to implement the function differently if you wish.
 buildBDD :: BExp -> [Index] -> BDD
-buildBDD 
-  = undefined
+-- _ []   = (0, [])
+--buildBDD _   = (1, [])
+buildBDD exp is = (2, buildBDD' exp 2 is)
 
 -- Potential helper function for buildBDD which you are free
 -- to define/modify/ignore/delete/embed as you see fit.
-buildBDD' :: BExp -> NodeId -> [Index] -> BDD
-buildBDD' 
-  = undefined
+buildBDD' :: BExp -> NodeId -> [Index] -> [BDDNode]
+--buildBDD' (Prim False) id is' = (id, ())
+--buildBDD' (Prim True) id is  = 
+buildBDD' exp id is
+  = (id, (i,li, ri)) : ((buildBDD' lexp li is') ++ (buildBDD' rexp ri is'))
+  where
+    i   = head is
+    is' = tail is
+    li  = id * 2
+    ri  = id * 2 + 1
+    lexp = restrict exp i False
+    rexp = restrict exp i True
 
 ------------------------------------------------------
 -- PART IV
