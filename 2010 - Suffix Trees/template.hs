@@ -4,45 +4,86 @@ data SuffixTree = Leaf Int | Node [(String, SuffixTree)]
 ------------------------------------------------------
 
 isPrefix :: String -> String -> Bool
-isPrefix 
-  = undefined
+isPrefix pre str
+  = pre == (take $ length pre) str
 
 removePrefix :: String -> String -> String
-removePrefix
+removePrefix pre str
 --Pre: s is a prefix of s'
-  = undefined
+  = (drop $ length pre) str
 
 suffixes :: [a] -> [[a]]
-suffixes
-  = undefined
+suffixes []           = []
+suffixes str@(s : ss) = str : suffixes ss 
 
 isSubstring :: String -> String -> Bool
-isSubstring
-  = undefined
+isSubstring sub str
+  = (or . map (isPrefix sub)) (suffixes str)    --any = or . map
 
 findSubstrings :: String -> String -> [Int]
-findSubstrings
-  = undefined
+findSubstrings sub str
+  |isSubstring sub str   = [index | (bVal, index) <- indexZip, bVal]
+  |otherwise             = []
+  where
+    findSubs = map (isPrefix sub) (suffixes str)
+    indexZip = zip findSubs [0..]
 
 ------------------------------------------------------
 
 getIndices :: SuffixTree -> [Int]
-getIndices 
-  = undefined
+getIndices (Node [])       = []
+getIndices (Leaf n)        = [n]
+getIndices (Node (n : ns)) = getIndices (snd n) ++ getIndices (Node ns)
 
 partition :: Eq a => [a] -> [a] -> ([a], [a], [a])
-partition 
-  = undefined
+partition str str'
+  = (comPre, drop comLen str, drop comLen str')
+  where
+    comPre = partition' str str'
+    comLen = length comPre
+    partition' :: Eq a => [a] -> [a] -> [a]
+    partition' [] str'  = str'
+    partition' str []   = []  
+    partition' (s : ss) (s' : ss')
+      |s == s'          = s : partition' ss ss'
+      |otherwise        = []
+
+
 
 findSubstrings' :: String -> SuffixTree -> [Int]
-findSubstrings'
-  = undefined
+findSubstrings' sub (Node [])   = []
+findSubstrings' sub (Node ((str, Leaf i) : ns))
+  |isPrefix sub str || (null str && null sub) = [i] ++ findSubstrings' sub (Node ns)
+  |otherwise                    = findSubstrings' sub (Node ns) 
+findSubstrings' sub (Node (n : ns))
+  |not $ null comPre            = findSubstrings' remSub (snd n) ++ findSubstrings' sub (Node ns)
+  |otherwise                    = findSubstrings' sub (Node ns)
+  where
+    (comPre,remSub,_)  = partition sub (fst n)
 
 ------------------------------------------------------
 
+-- insert :: (String, Int) -> SuffixTree -> SuffixTree
+-- insert p@(suf, i) (Node ((str, subTree) : ns))
+--   |null comPre        = insert p (Node ns)
+--   |not $ null comPre  = case comPre of  
+--                              str -> (remSuf, Leaf i) : subTree
+
+--   where
+--     (comPre,remSuf,remStr)  = partition sub str
+
 insert :: (String, Int) -> SuffixTree -> SuffixTree
-insert 
-  = undefined
+insert (s, n) (Node []) = Node [(s, Leaf n)]
+insert (s, n) (Node ((a, t) : ats))
+  | null pre  = merge (Node [(a, t)]) (insert (s, n) (Node ats))
+  | pre == a  = Node ((a, insert (remS, n) t) : ats)
+  | otherwise = merge (Node [(pre, Node [(remS, Leaf n), (remA, t)])]) (Node ats)
+  where
+    (pre, remS, remA) = partition s a
+
+    merge :: SuffixTree -> SuffixTree ->SuffixTree
+    merge (Node xs) (Node ys)
+      = Node (xs ++ ys)
 
 -- This function is given
 buildTree :: String -> SuffixTree 
