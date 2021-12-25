@@ -49,22 +49,27 @@ primTypes
 
 -- Pre: The search item is in the table
 lookUp :: Eq a => a -> [(a, b)] -> b
-lookUp 
-  = undefined
+lookUp src dict 
+  = head [y | (x, y) <- dict, x == src]
+  -- (snd . head) $ filter (\(x, y) -> x == src) dict
 
 tryToLookUp :: Eq a => a -> b -> [(a, b)] -> b
-tryToLookUp 
-  = undefined
+tryToLookUp src defa dict
+  | null look = defa
+  | otherwise = head look
+  where
+    look = [y | (x, y) <- dict, x == src]
 
 -- Pre: The given value is in the table
 reverseLookUp :: Eq b => b -> [(a, b)] -> [a]
-reverseLookUp 
-  = undefined
+reverseLookUp val dict 
+  = [x | (x, y) <- dict, y == val]
+  --(map fst) $  filter (\(x, y) -> y == val) dict
 
 occurs :: String -> Type -> Bool
-occurs 
-  = undefined
-
+occurs var (TVar str)  = var == str
+occurs var (TFun t t') = occurs var t || occurs var t'
+occurs _ _             = False
 ------------------------------------------------------
 -- PART II
 
@@ -72,22 +77,62 @@ occurs
 -- Pre: All variables in the expression have a binding in the given 
 --      type environment
 inferType :: Expr -> TEnv -> Type
-inferType
-  = undefined
+inferType (Number _) _    = TInt
+inferType (Boolean _) _   = TBool
+inferType (Id str) env    = lookUp str env
+inferType (Prim str) _    = lookUp str primTypes
+inferType (Cond exp exp' exp'') env
+  | inferType exp env == TBool && typeThen == typeElse 
+    = typeThen 
+  | otherwise
+    = TErr
+  where
+    typeThen = inferType exp' env
+    typeElse = inferType exp'' env
+inferType (App func arg) env 
+  = inferAppType (inferType func env) (inferType arg env)
+  where
+    inferAppType :: Type -> Type -> Type
+    inferAppType (TFun t t') tArg
+      | tArg == t = t'
+      -- | otherwise = TErr
+    inferAppType _ _ = TErr
+
 
 ------------------------------------------------------
 -- PART III
-
-applySub
-  = undefined
+applySub :: Sub -> Type -> Type
+applySub subs (TVar str)  = tryToLookUp str (TVar str) subs
+applySub subs (TFun t t') = TFun (applySub subs t) (applySub subs t')
+applySub _ t              = t
 
 unify :: Type -> Type -> Maybe Sub
 unify t t'
   = unifyPairs [(t, t')] []
 
 unifyPairs :: [(Type, Type)] -> Sub -> Maybe Sub
-unifyPairs
-  = undefined
+unifyPairs [] subs                       = Just subs
+unifyPairs ((TInt, TInt) : ts) subs      = unifyPairs ts subs
+unifyPairs ((TBool, TBool) : ts) subs    = unifyPairs ts subs
+unifyPairs ((TVar v, TVar v') : ts) subs
+  | v == v'                              = unifyPairs ts subs
+unifyPairs ((TVar v, t) : ts) subs
+  | occurs v t                           = Nothing
+  | otherwise                            = unifyPairs ts' subs'  
+  where
+    subs'                                = (v, t) : subs
+    ts'                                  = map (\(x, y) -> (applySub subs' x, applySub subs' y)) ts
+unifyPairs ((t, TVar v) : ts) subs
+  | occurs v t                           = Nothing
+  | otherwise                            = unifyPairs ts' subs'  
+  where
+    subs'                                = (v, t) : subs
+    ts'                                  = map (\(x, y) -> (applySub subs' x, applySub subs' y)) ts
+unifyPairs ((TFun t1 t2, TFun t1' t2') : ts) subs
+  = unifyPairs ((t1, t1') : (t2, t2') : ts) subs
+unifyPairs _ _                           = Nothing
+
+
 
 ------------------------------------------------------
 -- PART IV
