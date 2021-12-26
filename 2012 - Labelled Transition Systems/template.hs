@@ -23,58 +23,102 @@ type StateMap = [((State, State), State)]
 
 lookUp :: Eq a => a -> [(a, b)] -> b
 --Pre: The item is in the table
-lookUp
-  = undefined
+lookUp src dict
+  = head [y | (x, y) <- dict, x == src]
 
 states :: LTS -> [State]
-states
-  = undefined
+states lts
+  = nub $ concatMap (\(x, y) -> [x, y]) (map fst lts)
 
 transitions :: State -> LTS -> [Transition]
-transitions
-  = undefined
+transitions stat lts
+  = [(x, y) | (x, y) <- lts, fst x == stat]
 
 alphabet :: LTS -> Alphabet
-alphabet 
-  = undefined
+alphabet lts
+  = nub $ map snd lts
 
 ------------------------------------------------------
 -- PART II
 
 actions :: Process -> [Id]
-actions
-  = undefined
+actions p
+  = nub $ actionsHelper p
+  where
+    actionsHelper :: Process -> [Id]
+    actionsHelper (Prefix id p)      = id : actionsHelper p
+    actionsHelper (Choice (p : ps))  = actionsHelper p ++ actionsHelper (Choice ps)
+    actionsHelper _                  = []
 
 accepts :: [Id] -> [ProcessDef] -> Bool
 --Pre: The first item in the list of process definitions is
 --     that of the start process.
-accepts 
-  = undefined
-
+accepts ids pds@(p : _)
+  = acceptsHelper ids pds (snd p) -- snd p is the Process associated to the definiton
+  where
+    acceptsHelper :: [Id] -> [ProcessDef] -> Process -> Bool
+    acceptsHelper [] _ _            
+      = True
+    acceptsHelper ids pds (Ref x)
+      = acceptsHelper ids pds (lookUp x pds)  
+    acceptsHelper (i : is) pds (Prefix x p)
+      = i == x && acceptsHelper is pds p
+    acceptsHelper ids@(i : _) pds (Choice (p : ps))
+      | acceptsHelper [i] pds p = acceptsHelper ids pds p
+      | otherwise               = acceptsHelper ids pds (Choice ps)
+    acceptsHelper _ _ _        
+      = False
 ------------------------------------------------------
 -- PART III
 
---composeTransitions :: Transition -> Transition 
---                   -> Alphabet -> Alphabet 
---                   -> StateMap 
---                   -> [Transition]
+composeTransitions :: Transition -> Transition
+                   -> Alphabet -> Alphabet -> StateMap -> [Transition]
 --Pre: The first alphabet is that of the LTS from which the first transition is
 --     drawn; likewise the second.
 --Pre: All (four) pairs of source and target states drawn from the two transitions
 --     are contained in the given StateMap.
-composeTransitions
-  = undefined
+composeTransitions ((s, t), a) ((s', t'), a') al al' sMap
+  | a == a'                   = [((ss', tt'), a)]
+  | elem a al' && elem a' al  = []
+  | elem a' al                = [((ss', ts'), a)]
+  | elem a al'                = [((ss', st'), a')]
+  | otherwise                 = [((ss', ts'), a), ((ss', st'), a')]
+  where
+    ss' = lookUp (s, s') sMap
+    tt' = lookUp (t, t') sMap
+    ts' = lookUp (t, s') sMap
+    st' = lookUp (s, t') sMap
 
 pruneTransitions :: [Transition] -> LTS
-pruneTransitions 
-  = undefined
+pruneTransitions ts
+  = visit 0 []
+  where
+    visit :: State -> [State] -> [Transition]
+    visit s visited
+      | elem s visited = []
+      | otherwise      = trans ++ concatMap (flip visit (s : visited)) newDest
+      where 
+        trans   = transitions s ts
+        newDest = map (snd . fst) trans
 
 ------------------------------------------------------
 -- PART IV
 
 compose :: LTS -> LTS -> LTS
-compose 
-  = undefined
+compose lts1 lts2
+  = nub $ (pruneTransitions . concat) [composeTransitions t1 t2 a1 a2 (getStateMap s1 s2) 
+                                | t1 <- lts1 ++ sentinels1 s1, t2 <- lts2 ++ sentinels2 s2]
+  where
+    a1         = "$2" : alphabet lts1 -- explained in 5.2.2 The Catch
+    a2         = "$1" : alphabet lts2
+    s1         = states lts1
+    s2         = states lts2
+    sentinels1 = map (\s -> ((s, 0), "$1"))
+    sentinels2 = map (\s -> ((s, 0), "$2"))
+
+    getStateMap :: [State] -> [State] -> StateMap          -- cartesian product of the 2 LTSs
+    getStateMap ss1 ss2 = zip [(s1, s2) | s1 <- ss1, s2 <- ss2] 
+                            [0..length ss1 * length ss2 - 1]
 
 ------------------------------------------------------
 -- PART V
@@ -124,8 +168,8 @@ on
 ------------------------------------------------------
 -- Sample LTSs...
 
-vendorLTS, clockLTS, playLTS, clockPlayLTS, makerLTS, userLTS, makerUserLTS, 
-  pLTS, qLTS, pqLTS, switchLTS :: LTS
+vendorLTS, clockLTS, playLTS, clockPlayLTS, makerLTS, userLTS, makerUserLTS :: LTS
+pLTS, qLTS, pqLTS, switchLTS :: LTS
 
 vendorLTS 
   = [((0,1),"off"),((0,2),"blue"),((0,3),"red"),((2,0),"tea"),((3,0),"coffee")]
