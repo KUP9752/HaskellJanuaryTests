@@ -1,58 +1,107 @@
+import Data.List hiding (insert)
+
 type BinHeap a = [BinTree a]
 
-data BinTree a = Node a Int (BinHeap a)
+data BinTree a = Node a Int (BinHeap a)  --value, rank subtrees
                deriving (Eq, Ord, Show)
 
 --------------------------------------------------------------
 -- PART I
 
-key :: BinTree a -> a
-key
-  = undefined
+value :: BinTree a -> a
+value (Node val _ _) 
+  = val
 
 rank :: BinTree a -> Int
-rank
-  = undefined
+rank (Node _ rank _ ) 
+  = rank
+
 
 children :: BinTree a -> [BinTree a]
-children
-  = undefined
+children (Node  _ _ cs)
+  = cs
 
+-- Only works if they are the same rank
 combineTrees :: Ord a => BinTree a -> BinTree a -> BinTree a
-combineTrees 
-  = undefined
+combineTrees  t t'
+  | rVal >= rVal' = Node rVal' (r' + 1) (t : cs')
+  | otherwise     = Node rVal (r + 1) (t' : cs)
+  where
+    rVal  = value t
+    rVal' = value t' 
+    (r, r') = (rank t, rank t')
+    cs    = children t
+    cs'   = children t'
 
+    
+    
 --------------------------------------------------------------
 -- PART II
 
 extractMin :: Ord a => BinHeap a -> a
-extractMin 
-  = undefined
+extractMin = minimum . map value
 
 mergeHeaps :: Ord a => BinHeap a -> BinHeap a -> BinHeap a
-mergeHeaps 
-  = undefined
+mergeHeaps h []  = h
+mergeHeaps [] h' = h'
+mergeHeaps h@(t : ts) h'@(t' : ts') 
+  | rank t < rank t'     = [t] ++ mergeHeaps ts h'
+  | rank t' < rank t     = [t'] ++ mergeHeaps h ts'
+  | otherwise            = mergeHeaps [combineTrees t t'] (mergeHeaps ts ts')
+
 
 insert :: Ord a => a -> BinHeap a -> BinHeap a
-insert 
-  = undefined
+insert val h
+  = mergeHeaps [Node val 0 []] h
 
 deleteMin :: Ord a => BinHeap a -> BinHeap a
-deleteMin 
-  = undefined
+deleteMin h
+  = mergeHeaps h' (remove (minTree h) h)
+  where 
+    minVal                 = extractMin h
+    h'                     = (reverse . children $ minTree h)
+    minTree (t : ts)
+      | value t == minVal  = t
+      | otherwise          = minTree ts
 
-remove :: Eq a => a -> BinHeap a -> BinHeap a
-remove
-  = undefined
+remove :: Eq a => a ->  [a] -> [a]
+remove remT (t : ts)
+  | t == remT  = ts
+  | otherwise  = t : remove remT ts
 
-removeMin :: Ord a => BinHeap a -> (BinTree a, BinHeap a)
-removeMin
-  = undefined
+makeHeap :: Ord a => [a] -> BinHeap a
+makeHeap items
+  = makeHelper items []
+  where 
+    makeHelper :: Ord a => [a] -> BinHeap a -> BinHeap a
+    makeHelper [] h = h
+    makeHelper (i : is) h = makeHelper is (insert i h)
 
 binSort :: Ord a => [a] -> [a]
-binSort 
-  = undefined
+binSort items
+  = sortHelper (makeHeap items)
+  where 
+    h = makeHeap items
+    sortHelper :: Ord a => BinHeap a -> [a]
+    sortHelper [] = []
+    sortHelper h  = extractMin h : sortHelper (deleteMin h)
 
+-------------------------- ONLINE SOLUTIONS
+makeHeap' :: Ord a => [a] -> BinHeap a
+makeHeap'
+  = foldr (mergeHeaps . flip insert []) []
+
+sortHeap' :: Ord a => BinHeap a -> [a]
+sortHeap'
+  = unfoldr maybeMin
+  where
+    maybeMin h'
+      | null h'   = Nothing
+      | otherwise = Just (extractMin h', deleteMin h')
+
+binSort' :: Ord a => [a] -> [a]
+binSort'
+  = sortHeap' . makeHeap
 --------------------------------------------------------------
 -- PART III
 
