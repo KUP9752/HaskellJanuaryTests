@@ -50,41 +50,59 @@ showRE' re
 
 lookUp :: Eq a => a -> [(a, b)] -> b
 --Pre: There is exactly one occurrence of the item being looked up.
-lookUp 
-  = undefined
+lookUp src dict
+  = head [y | (x, y) <- dict, x == src]
 
 simplify :: RE -> RE
-simplify
-  = undefined
+simplify (Seq exp exp') = Seq (simplify exp) (simplify exp')
+simplify (Alt exp exp') = Alt (simplify exp) (simplify exp') 
+simplify (Rep exp)      = Rep (simplify exp)
+simplify (Plus exp)     = Seq (simplify exp) (Rep (simplify exp))
+simplify (Opt exp)      = Alt (simplify exp) (Null)
+simplify rExp           = rExp
 
 --------------------------------------------------------
 -- Part II
 
 startState :: Automaton -> State
-startState
-  = undefined
+startState (sState, _, _)
+  = sState
 terminalStates :: Automaton -> [State]
-terminalStates
-  = undefined
+terminalStates(_, tStates, _)
+  = tStates
 transitions :: Automaton -> [Transition]
-transitions 
-  = undefined
+transitions (_, _, ts) 
+  = ts
 
 isTerminal :: State -> Automaton -> Bool
-isTerminal 
-  = undefined
+isTerminal s aut
+  = any (s ==) (terminalStates aut)
 
 transitionsFrom :: State -> Automaton -> [Transition]
-transitionsFrom
-  = undefined
+transitionsFrom s aut
+  = [t | t@(start, _, _) <- transitions aut, start == s]
 
 labels :: [Transition] -> [Label]
-labels 
-  = undefined
+labels
+  = (nub . filter (Eps /=). map (\(_, _, label) -> label))
 
 accepts :: Automaton -> String -> Bool
-accepts 
-  = undefined
+accepts aut str
+  = accepts' (startState aut) str
+  where
+    accepts' :: State -> String -> Bool
+    accepts' s str
+      | (isTerminal s aut) && null str = True
+      | otherwise                = any (try str) (transitionsFrom s aut)
+      where
+        try :: String -> Transition -> Bool
+        try str (s, t, Eps)        = accepts' t str
+        try [] (s, t, C c)         = False
+        try (str : strs) (s, t, C c)
+          | str == c               = accepts' t strs
+          | otherwise              = False
+      
+    
 
 --------------------------------------------------------
 -- Part III
@@ -96,8 +114,25 @@ makeNDA re
     (transitions, k) = make (simplify re) 1 2 3
 
 make :: RE -> Int -> Int -> Int -> ([Transition], Int)
-make 
-  = undefined
+make Null m n k        
+  = ([(m, n, Eps)], k)
+make (Term chr) m n k
+  = ([(m, n, C chr)], k)
+make (Seq r1 r2) m n k 
+  = ((k, k + 1, Eps) : mR1 ++ mR2, k'')
+  where
+    (mR1, k')     = make r1 m k (k + 2)
+    (mR2, k'')    = make r2 n (k + 1) k' 
+make (Alt r1 r2) m n k 
+  = ([(m, k, Eps), (m, k + 2, Eps),(k + 1, n, Eps), (k + 3, n, Eps)] ++ mR1 ++ mR2, k'')
+  where
+    (mR1, k')     = make r1 k (k + 1) (k + 4)
+    (mR2, k'')    = make r2 (k + 2) (k + 3) k''
+make (Rep r) m n k
+  = ([(m, k, Eps), (m, n, Eps), (k + 1, n, Eps), (k + 1, k, Eps)] ++ mR, k')
+  where
+    (mR, k')      = make r k (k + 1) (k + 2)
+
 
 --------------------------------------------------------
 -- Part IV
