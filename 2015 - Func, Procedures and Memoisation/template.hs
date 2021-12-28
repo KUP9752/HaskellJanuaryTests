@@ -61,51 +61,92 @@ type State = [Binding]
 
 getValue :: Id -> State -> Value
 -- Pre: The identifier has a binding in the state
-getValue 
-  = undefined
+getValue id
+  = (snd . lookUp id)
 
 getLocals :: State -> State
 getLocals
-  = undefined
+  = filter (\(_, (scope, _)) -> scope == Local)
 
 getGlobals :: State -> State
 getGlobals
-  = undefined
+  = filter (\(_, (scope, _)) -> scope == Global)
 
 assignArray :: Value -> Value -> Value -> Value
 -- The arguments are the array, index and (new) value respectively
 -- Pre: The three values have the appropriate value types (array (A), 
 --      integer (I) and integer (I)) respectively.
-assignArray 
-  = undefined
+assignArray (A as) (I i) (I v)
+  = A [if (x ==  i) then (x, v) else (x, y) | (x, y) <- as]
 
 updateVar :: (Id, Value) -> State -> State
-updateVar 
-  = undefined
+updateVar (id, val) s
+  | elem id $ map fst s --(id, (sc, val)) : s
+    = [if (i == id) then (i, (sc, val)) else (i, (sc, v)) | (i, (sc,v)) <- s]
+  | otherwise           = (id, (Local, val)) : s
+ -- where 
+    --(_, (sc, _)) = head $ filter  (\x -> fst x == id) s
 
 ---------------------------------------------------------------------
 -- Part II
 
 applyOp :: Op -> Value -> Value -> Value
 -- Pre: The values have the appropriate types (I or A) for each primitive
-applyOp 
-  = undefined
+applyOp Add (I i) (I i')   
+  = I (i + i')
+applyOp Mul (I i) (I i')
+  = I (i * i') 
+applyOp Less (I i) (I i')
+  | i < i'     = I 1
+  | otherwise  = I 0
+applyOp Equal (I i) (I i')
+  | i == i'    = I 1
+  | otherwise  = I 0 
+applyOp Index (A as) (I i)
+  | cond       = I (lookUp i as)
+  | otherwise  = I 0 
+  where 
+    cond = elem i $ map fst as
 
 bindArgs :: [Id] -> [Value] -> State
+-- Pre: the lists have the same length both will be empty at the same time
+bindArgs 
+  = bindHelper [] 
+  where
+    bindHelper :: State -> [Id] -> [Value] -> State
+    bindHelper s [] [] 
+      = s
+    bindHelper s (i : is) (v : vs)
+      = bindHelper (updateVar (i, v) s) is vs
+
+bindArgs' :: [Id] -> [Value] -> State
 -- Pre: the lists have the same length
-bindArgs
-  = undefined
+bindArgs' is vs
+  = zip is (zip (repeat Local) vs)
+
 
 evalArgs :: [Exp] -> [FunDef] -> State -> [Value]
-evalArgs
-  = undefined
+evalArgs es fs s
+  = map (\e -> eval e fs s) es
 
 eval :: Exp -> [FunDef] -> State -> Value
 -- Pre: All expressions are well formed
 -- Pre: All variables referenced have bindings in the given state
-eval 
-  = undefined
-
+eval (Const c) _ _
+  = c
+eval (Var id)  _ s
+  = getValue id s
+eval (OpApp op e e') fs s
+  = applyOp  op (eval e fs s) (eval e' fs s)
+eval (Cond e e' e'') fs s
+  | (eval e fs s) == (I 1)  = (eval e' fs s)
+  | otherwise               = (eval e'' fs s)
+eval (FunApp id es) fs s
+  = (eval e fs s')
+  where 
+    (is, e) = lookUp id fs
+    vs      = evalArgs es fs s
+    s'      = bindArgs is vs
 ---------------------------------------------------------------------
 -- Part III
 
@@ -113,13 +154,35 @@ executeStatement :: Statement -> [FunDef] -> [ProcDef] -> State -> State
 -- Pre: All statements are well formed 
 -- Pre: For array element assignment (AssignA) the array variable is in scope,
 --      i.e. it has a binding in the given state
-executeStatement 
-  = undefined
+executeStatement (Assign id e) fs _ s
+  = updateVar (id, eval e fs s) s
+executeStatement (AssignA id e e') fs _ s
+  = updateVar (id, assignArray (getValue id s) (eval e fs s) (eval e' fs s)) s
+executeStatement (If e b b') fs ps s
+  | eval e fs s == I 1 = executeBlock b fs ps s
+  | otherwise          = executeBlock b' fs ps s
+executeStatement (While e b) fs ps s
+  | eval e fs s == I 1 = executeStatement (While e b) fs ps (executeBlock b fs ps s)
+  | otherwise          = s
+executeStatement (Call id id' es) fs ps s
+  | id == ""  = globs'' ++ locals
+  | otherwise = updateVar (id, getValue "$res" s'') (globs'' ++ locals)
+  where
+    (is, b) = lookUp id' ps
+    vs       = evalArgs es fs s
+    s'       = bindArgs is vs
+    s''      = executeBlock b fs ps (s' ++ s)
+    globs''  = getGlobals s''
+    locals   = getLocals s
+executeStatement (Return e) fs _ s
+  = updateVar ("$res", eval e fs s) s
 
 executeBlock :: Block -> [FunDef] -> [ProcDef] -> State -> State
 -- Pre: All code blocks and associated statements are well formed
-executeBlock 
-  = undefined
+executeBlock [] _ _ s
+  = s
+executeBlock (b : bs) fs ps s
+  = executeBlock bs fs ps (executeStatement b fs ps s)
 
 ---------------------------------------------------------------------
 -- Part IV
