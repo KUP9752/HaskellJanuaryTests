@@ -46,29 +46,55 @@ printXMLs
 -- Part I
 
 skipSpace :: String -> String
-skipSpace
-  = undefined
+skipSpace []   = ""
+skipSpace str@(s : ss)
+  | isSpace s  = skipSpace ss
+  | otherwise  = str
 
 getAttribute :: String -> XML -> String
-getAttribute 
-  = undefined
+getAttribute str (Element _ attr _)
+  | null found = ""
+  | otherwise  = head found
+  where
+    found = [s | (n, s) <- attr, n ==str]
+    -- fromMaybe $ lookup str attr
+getAttribute _ _
+  = ""
+
+getName :: XML -> String
+getName (Element name _ _) = name
+getName _                  = ""
 
 getChildren :: String -> XML -> [XML]
-getChildren 
-  = undefined
+getChildren name (Element n attr xs)
+  =  filter (\xml -> getName xml == name) xs
+getChildren _ _
+  = []
 
 getChild :: String -> XML -> XML
-getChild 
-  = undefined
+getChild str xml
+  | null cs   = Text ""
+  | otherwise = head cs
+  where
+    cs = getChildren str xml
 
 addChild :: XML -> XML -> XML
 -- Pre: the second argument is an Element
-addChild 
-  = undefined
+addChild child (Element n attr xs)
+  = Element n attr (xs ++ [child])
 
 getValue :: XML -> XML
-getValue 
-  = undefined
+getValue xml
+  = Text (getValueHelper xml)
+  where
+    getValueHelper :: XML -> String
+    getValueHelper Null
+      = ""
+    getValueHelper (Text str)
+      = str
+    getValueHelper (Element n attr (x : xs))
+      | null xs   = getValueHelper x 
+      | otherwise = getValueHelper x ++ getValueHelper (Element n attr xs)
 
 -------------------------------------------------------------------------
 -- Part II
@@ -90,18 +116,30 @@ sentinel
 
 addText :: String -> Stack -> Stack
 -- Pre: There is at least one Element on the stack
-addText 
-  = undefined
+addText str (s : ss)
+  = (addChild (Text str) s) : ss
 
 popAndAdd :: Stack -> Stack
 -- Pre: There are at least two Elements on the stack
-popAndAdd 
-  = undefined
+popAndAdd (s : s' : ss) 
+  = (addChild s s') : ss
 
 parseAttributes :: String -> (Attributes, String)
 -- Pre: The XML attributes string is well-formed
 parseAttributes 
-  = undefined
+  = parseHelper . skipSpace
+  where
+    parseHelper :: String -> (Attributes, String)
+    parseHelper str@(s : ss)
+      | elem s ">"      = ([], skipSpace ss)
+      | otherwise       = ((name, aName) : attrs, rest'' )
+      where 
+        (name, rest)    =  parseName str
+        (aName, rest')  = (break ('\"' ==) . tail 
+                         . dropWhile ('\"' /=) . skipSpace) rest
+        (attrs, rest'') = (parseHelper . skipSpace . tail) rest' 
+        --tail rest removes the closing '\"'
+
 
 parse :: String -> XML
 -- Pre: The XML string is well-formed
@@ -109,8 +147,19 @@ parse s
   = parse' (skipSpace s) [sentinel]
 
 parse' :: String -> Stack -> XML
-parse' 
-  = undefined
+parse' "" (Element _ _ (x : _) : _)
+  = x
+parse' ('<' : '/' : ss) st
+  = parse' ((skipSpace . tail . snd . break ('>' ==)) ss) (popAndAdd st)
+parse' ('<' : ss) st
+  = parse' rest' (Element elemName attrs [] : st)
+  where
+    (elemName, rest)  = (break (\c -> isSpace c || c == '>') . skipSpace) ss 
+    (attrs, rest')    = parseAttributes rest   --spaces are skipped in the func
+parse' s st
+  = parse' rest (addText text st)
+  where
+    (text, rest)      = break (=='<') s
 
 -------------------------------------------------------------------------
 -- Part III
