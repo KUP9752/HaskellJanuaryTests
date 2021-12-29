@@ -36,27 +36,49 @@ execFun (name, args, p) vs
 type State = [(Id, Int)]
 
 update :: (Id, Int) -> State -> State
-update 
-  = undefined
+update (id, val) s
+  = (id, val) : filter (\(x, y) -> x /= id) s
 
 apply :: Op -> Int -> Int -> Int
-apply 
-  = undefined
+apply Add   = (+) 
+apply Mul   = (*) 
+apply Eq    = (boolConv .) . (==)
+apply Gtr   = (boolConv .) . (>)
+
+boolConv :: Bool -> Int
+boolConv True = 1
+boolConv _    = 0
 
 eval :: Exp -> State -> Int
 -- Pre: the variables in the expression will all be bound in the given state 
 -- Pre: expressions do not contain phi instructions
-eval 
-  = undefined
+eval (Const n) s
+  = n
+eval (Var id) s
+  = lookUp id s
+eval (Apply op e e') s
+  = apply op (eval e s) (eval e' s)
 
 execStatement :: Statement -> State -> State
-execStatement 
-  = undefined
+execStatement (Assign id e) s
+  = update (id, eval e s) s
+execStatement (If e b b') s
+  | eval e s == 1 = execBlock b s
+  | otherwise     = execBlock b' s
+execStatement (DoWhile b e) s
+  | eval e s' == 1 = execStatement (DoWhile b e) s'
+  | otherwise      = s'
+  where
+    s' = execBlock b s 
 
 execBlock :: Block -> State -> State
-execBlock 
-  = undefined
+execBlock [] s
+  = s
+execBlock (st : sts) s
+  = execBlock sts (execStatement st s)
 
+--foldl (flip execStatement) s b
+    
 ------------------------------------------------------------------------
 -- Given function for testing propagateConstants...
 
@@ -70,24 +92,72 @@ applyPropagate (name, args, body)
 
 foldConst :: Exp -> Exp
 -- Pre: the expression is in SSA form
-foldConst 
-  = undefined
+foldConst (Phi (Const c) (Const c'))
+  | c == c'   = Const c
+foldConst (Apply op (Const c) (Const c'))
+  = Const (apply op c c')
+foldConst (Apply Add var@(Var id) (Const 0))
+  = var
+foldConst (Apply Add (Const 0) var@(Var id))
+  = var
+foldConst exp
+  = exp
+
 
 sub :: Id -> Int -> Exp -> Exp
 -- Pre: the expression is in SSA form
-sub 
-  = undefined
+sub id val
+  = foldConst . sub'
+  where
+    sub' :: Exp -> Exp
+    sub' (Var vId)
+      | id == vId = Const val
+    sub' (Apply op e e')
+      = Apply op (sub' e) (sub' e')
+    sub' (Phi e e')
+      = Phi (sub' e) (sub' e')
+    sub' exp
+      = exp
 
 -- Use (by uncommenting) any of the following, as you see fit...
--- type Worklist = [(Id, Int)]
--- scan :: Id -> Int -> Block -> (Worklist, Block)
 -- scan :: (Exp -> Exp) -> Block -> (Exp -> Exp, Block)
- 
+
+type Worklist = [(Id, Int)]
+scan :: Id -> Int -> Block -> (Worklist, Block)
+scan id val b
+  = foldr scan' ([], []) b
+  where
+   -- scan' :: Statement -> (Worklist, Block) -> (Worklist, Block)
+    scan' (Assign "$return" e) (wl, b)
+      = (wl, Assign "$return" (sub id val e) : b)
+    scan' (Assign id' e) (wl, b)
+      = scan'' (sub id val e)
+      where
+        scan'' (Const c)
+          = ((id', c) : wl,b)
+        scan'' exp
+          = (wl, (Assign id' exp) : b)
+    scan' (If p q r) (wl, b)
+      = (wl ++ wl' ++ wl'', If (sub id val p) q' r' : b)
+      where
+        (wl', q')  = scan id val q
+        (wl'', r') = scan id val r
+    scan' (DoWhile b' e) (wl, b)
+      = (wl ++ wl', DoWhile b'' (sub id val e) : b)
+      where
+        (wl', b'') = scan id val b'
+
 propagateConstants :: Block -> Block
 -- Pre: the block is in SSA form
 propagateConstants 
-  = undefined
-
+  = prop . (scan "$INVALID" 0)
+  where 
+    prop ([], b)
+      = b
+    prop ((v, c) : wl, b)
+      = prop (wl ++ wl', b')
+      where
+        (wl', b') = scan v c b
 ------------------------------------------------------------------------
 -- Given functions for testing unPhi...
 
