@@ -41,41 +41,74 @@ lookUp x table
 
 allSame :: Eq a => [a] -> Bool
 allSame 
-  = undefined
+  = null . tail . nub
 
 remove :: Eq a => a -> [(a, b)] -> [(a, b)]
-remove 
-  = undefined
+remove key 
+  = filter (\(x, y) -> x /= key) 
 
 lookUpAtt :: AttName -> Header -> Row -> AttValue
 --Pre: The attribute name is present in the given header.
-lookUpAtt
-  = undefined
+lookUpAtt aName h r
+  = lookUp aName dict
+  where
+    dict = zipWith (\(attName, _) attVal -> (attName, attVal)) h r
 
 removeAtt :: AttName -> Header -> Row -> Row
-removeAtt
-  = undefined
-
+removeAtt aName h r
+  = map snd $ remove aName dict 
+  where 
+    dict = zipWith (\(attName, _) attVal -> (attName, attVal)) h r
 addToMapping :: Eq a => (a, b) -> [(a, [b])] -> [(a, [b])]
-addToMapping
-  = undefined
+addToMapping newM@(x, v) m
+  | null $ foundX = (x, [v]) : m
+  | otherwise     = (x, v : (snd . head) foundX) : withoutX
+  where
+    foundX        = filter (\(a, _) -> a == x) m
+    withoutX      = filter (\(a, _) -> a /= x) m
+
 
 buildFrequencyTable :: Attribute -> DataSet -> [(AttValue, Int)]
 --Pre: Each row of the data set contains an instance of the attribute
-buildFrequencyTable
-  = undefined
+buildFrequencyTable (aName, aVals) (h, rs)
+  = count (nub allVals)
+  where 
+    allVals = map (lookUpAtt aName h) rs
+
+    count :: [AttValue] -> [(AttValue, Int)]
+    count [] 
+      = []
+    count (v : vs)
+      = (v, count' v) : count vs
+      
+    count' :: AttValue -> Int
+    count' val = (length . filter (val ==)) allVals
+
 
 --------------------------------------------------------------------
 -- PART II
 --------------------------------------------------------------------
 
 nodes :: DecisionTree -> Int
-nodes 
-  = undefined
+nodes (Node aName [])
+  = 1
+nodes (Node aName ((aVal, dt) : cs))
+  = nodes dt + nodes (Node aName cs)
+nodes (Leaf _ )
+  = 1
+nodes Null
+  = 0
 
 evalTree :: DecisionTree -> Header -> Row -> AttValue
-evalTree 
-  = undefined
+evalTree (Node aName cs) h rs
+  = evalTree (lookUp fval cs) h rs
+  where
+    fval = lookUpAtt aName h rs
+evalTree (Leaf val) _ _
+  = val
+evalTree Null _ _ 
+  = ""
+
 
 --------------------------------------------------------------------
 -- PART III
@@ -92,13 +125,27 @@ nextAtt :: AttSelector
 nextAtt (header, _) (classifierName, _)
   = head (filter ((/= classifierName) . fst) header)
 
-partitionData :: DataSet -> Attribute -> Partition
-partitionData 
-  = undefined
+partitionData :: DataSet -> Attribute -> Partition--[(AttValue, (Header, [Row]))]
+partitionData (h, rs) (aN, avs)
+  = zip avs nSet
+  where
+    nRows = [[removeAtt aN h r | r <- rs, lookUpAtt aN h r == av] | av <- avs]
+    nSet  = zip (repeat $ remove aN h) nRows
 
 buildTree :: DataSet -> Attribute -> AttSelector -> DecisionTree 
-buildTree 
-  = undefined
+buildTree (h, []) _ _
+  = Null
+buildTree ds@(h, rs) att@(aN, avs) sel
+  | allSame vals
+    = Leaf (head vals) 
+  | otherwise
+    = (Node aN' [(av', buildTree ds' att sel) | (av', ds') <- part])
+  where
+    vals              = map (lookUpAtt aN h) rs
+    att'@(aN', avs')  = sel ds att
+    part              = partitionData ds att'
+
+  
 
 --------------------------------------------------------------------
 -- PART IV
