@@ -4,7 +4,7 @@ import Data.Bits
 
 import Types
 
-hash :: HashFun
+hash :: HashFun  -- Int -> Hash
 hash x
   = op x'' 
   where
