@@ -8,7 +8,7 @@ import Examples
 
 ------------------------------------------------------
 --
--- Part I
+-- Part I 
 --
 count :: Eq a => a -> [a] -> Int
 count item 
