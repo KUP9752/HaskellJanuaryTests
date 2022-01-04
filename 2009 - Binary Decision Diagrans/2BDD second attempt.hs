@@ -13,11 +13,7 @@ type BDDNode =  (NodeId, (Index, NodeId, NodeId))
 
 type BDD = (NodeId, [BDDNode])
 
-------------------------------------------------------
--- PART I
-
--- Pre: The item is in the given table
--- because of the precondition no need to check for value not appearing
+-------------- PART I 
 lookUp :: Eq a => a -> [(a, b)] -> b
 lookUp item dict
   = head [y | (x, y) <- dict, x == item]
@@ -48,8 +44,8 @@ sat (start, tree)
       = satHelper fBranch ((i, False) : env) ++ (satHelper tBranch ((i, True) : env))
       where
         (i, fBranch, tBranch) = lookUp id tree
-------------------------------------------------------
--- PART II
+
+-------------- PART II
 simplify :: BExp -> BExp
 simplify (Not (Prim bool))
   = Prim (not bool)
@@ -77,9 +73,7 @@ restrict bExp id bool
     restrict' exp
       = simplify exp
 
-------------------------------------------------------
--- PART III
-
+---------------PART III 
 -- Pre: Each variable index in the BExp appears exactly once
 --     in the Index list; there are no other elements
 -- The question suggests the following definition (in terms of buildBDD')
@@ -101,16 +95,8 @@ buildBDD' exp id (i : is)
     (li, leftNodes)  = buildBDD' lexp (id * 2) is
     rexp             = restrict exp i True
     lexp             = restrict exp i False
-------------------------------------------------------
--- PART IV
 
--- Pre: Each variable index in the BExp appears exactly once
---      in the Index list; there are no other elements
-buildROBDD :: BExp -> [Index] -> BDD
-buildROBDD 
-  = undefined
 
-------------------------------------------------------
 -- Examples for testing...
 
 b1, b2, b3, b4, b5, b6, b7, b8 :: BExp
