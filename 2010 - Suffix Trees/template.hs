@@ -71,12 +71,31 @@ findSubstrings' sub (Node (n : ns))
 
 --   where
 --     (comPre,remSuf,remStr)  = partition sub str
-
 insert :: (String, Int) -> SuffixTree -> SuffixTree
-insert (s, n) (Node []) = Node [(s, Leaf n)]
-insert (s, n) (Node ((a, t) : ats))
-  | null pre  = merge (Node [(a, t)]) (insert (s, n) (Node ats))
-  | pre == a  = Node ((a, insert (remS, n) t) : ats)
+insert (s, n) (tree @ (Node xs))
+  | or (map commonPrefix xs) = Node (map inspect xs)
+  | otherwise                = Node ((s, Leaf n) : xs)
+  where
+    inspect :: (String, SuffixTree) -> (String, SuffixTree)
+    inspect (a, t)
+      | p == "" = (a, t)
+      | p == a  = (a, insert (sp, n) t)
+      | p /= a  = (p, Node [(sp, Leaf n), (ap, t)])
+      where
+        (p, sp, ap) = partition s a
+    
+    commonPrefix :: (String, SuffixTree) -> Bool
+    commonPrefix (xs, _)
+      =  x /= ""
+      where
+        (x, _, _) = partition s xs
+
+
+insert' :: (String, Int) -> SuffixTree -> SuffixTree
+insert' (s, n) (Node []) = Node [(s, Leaf n)]
+insert' (s, n) (Node ((a, t) : ats))
+  | null pre  = merge (Node [(a, t)]) (insert' (s, n) (Node ats))
+  | pre == a  = Node ((a, insert' (remS, n) t) : ats)
   | otherwise = merge (Node [(pre, Node [(remS, Leaf n), (remA, t)])]) (Node ats)
   where
     (pre, remS, remA) = partition s a
