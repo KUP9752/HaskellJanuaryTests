@@ -51,6 +51,9 @@ skipSpace str@(s : ss)
   | isSpace s  = skipSpace ss
   | otherwise  = str
 
+
+
+-- doesnt work for all cases!
 getAttribute :: String -> XML -> String
 getAttribute str (Element _ attr _)
   | null found = ""
