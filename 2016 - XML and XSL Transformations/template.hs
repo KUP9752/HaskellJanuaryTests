@@ -134,7 +134,7 @@ parseAttributes
   where
     parseHelper :: String -> (Attributes, String)
     parseHelper str@(s : ss)
-      | elem s ">"      = ([], skipSpace ss)
+      | elem s ">"      = ([], ss)
       | otherwise       = ((name, aName) : attrs, rest'' )
       where 
         (name, rest)    =  parseName str

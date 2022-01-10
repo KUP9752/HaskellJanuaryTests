@@ -1,4 +1,4 @@
-import Data.List
+  import Data.List
 import Data.Maybe
 
 type Id = String
