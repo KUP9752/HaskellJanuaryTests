@@ -69,6 +69,12 @@ getChildren str (Element name _ xs)
 getChildren _ _
   = []
 
+--Smarter way to solve the actual function
+-- getChild' :: String -> XML -> XML
+-- getChild' str xml
+--   = head cs ++ [Text ""]
+--   where
+--     cs = getChildren str xml
 
 getChild :: String -> XML -> XML
 getChild str xml
@@ -94,7 +100,7 @@ getValue xml
     getValue' (Text val) 
       = val
     getValue' (Element name _ xs)
-      = foldl1 (++) $ map (getValue') xs
+      = foldl1 (++) $ map (getValue') xs  -- Same as concatMap getValue' xs
 
 -------------------------------------------------------------------------
 -- Part II
@@ -186,9 +192,37 @@ expandXSL xsl source
     root = Element "/" [] [source] 
 
 expandXSL' :: Context -> XSL -> [XML]
-expandXSL' 
-  = undefined
+expandXSL' ctxt e@(Element name atts cs)
+  | name == "value-of" && null elems  = [Text ""]
+  | name == "value-of"                = [getValue (head elems)]
+  | name == "for-each"                = concat elems'
+  | otherwise                         = [Element name atts (concatMap (expandXSL' ctxt) cs)]
+  where
+    elems  = followXPath (parseXPath $ getAttribute "select" e) ctxt
+    elems' = [concatMap (expandXSL' e) cs | e <- elems] 
 
+expandXSL' _ t
+  = [t]
+
+followXPath :: [String] -> Context -> [XML]
+followXPath [] ctxt
+  = [ctxt]
+followXPath ("." : ss) ctxt
+  = followXPath ss ctxt
+followXPath (('@' : att) : ss) ctxt
+  = [Text (getAttribute att ctxt)]
+followXPath (cname : ss) ctxt
+  = concatMap (followXPath ss) (getChildren cname ctxt)
+
+
+parseXPath :: String -> [String]
+parseXPath ""
+  = [""]
+parseXPath str
+  | null rest = [s1] 
+  | otherwise = s1 : parseXPath (tail rest)
+  where
+    (s1, rest) = break (== '/') str
 -------------------------------------------------------------------------
 -- Test data for Parts I and II
 
