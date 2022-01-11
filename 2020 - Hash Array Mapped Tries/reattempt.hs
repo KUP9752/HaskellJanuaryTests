@@ -6,6 +6,7 @@ import Data.Bits
 import Types
 import HashFunctions
 import Examples
+import Distribution.Compat.Lens (_1)
 
 --------------------------------------------------------------------
 -- Part I
@@ -30,8 +31,13 @@ getIndex
 
 -- Pre: the index is less than the length of the list
 replace :: Int -> [a] -> a -> [a]
-replace
-  = undefined
+replace _ [] _
+  = []
+replace 0 (x : xs) val
+  = val : xs
+replace i (x : xs) val
+  = x : replace (i - 1) xs val
+
 
 -- Pre: the index is less than or equal to the length of the list
 insertAt :: Int -> a -> [a] -> [a]
