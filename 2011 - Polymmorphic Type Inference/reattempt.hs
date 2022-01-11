@@ -1,4 +1,6 @@
-import Data.Maybe
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+import Data.Maybe ()
+import XMonad.Actions.Search (dictionary)
 
 data Expr = Number Int |
             Boolean Bool |
@@ -45,6 +47,11 @@ primTypes
 lookUp :: Eq a => a -> [(a, b)] -> b
 lookUp item 
   = tryToLookUp item undefined 
+
+tryToLookUp' :: Eq a => a -> b -> [(a, b)] -> b
+tryToLookUp' item defV dict
+  = head $  [y | (x, y) <- dict, x == item ] ++ [defV]
+
 
 tryToLookUp :: Eq a => a -> b -> [(a, b)] -> b
 tryToLookUp item defV dict
@@ -112,7 +119,7 @@ applySub s t@(TVar v)
   = tryToLookUp v t s
 applySub s (TFun t t')
   = TFun (applySub s t) (applySub s t')
-applySub s t
+applySub _ t
   = t
 
 unify :: Type -> Type -> Maybe Sub
@@ -171,8 +178,10 @@ combineSubs
   = foldr1 combine
 
 inferPolyType :: Expr -> Type
-inferPolyType
-  = undefined
+inferPolyType e 
+  = t
+  where 
+    (_, t, _) = inferPolyType' e [] 1 
 
 -- You may optionally wish to use one of the following helper function declarations
 -- as suggested in the specification. 
@@ -181,9 +190,55 @@ inferPolyType
 -- inferPolyType'
 --   = undefined
 
--- inferPolyType' :: Expr -> TEnv -> Int -> (Sub, Type, Int)
--- inferPolyType' 
---   = undefined
+inferPolyType' :: Expr -> TEnv -> Int -> (Sub, Type, Int)
+inferPolyType' (Number _) _ n
+  = ([], TInt, n)
+inferPolyType' (Boolean _) _ n
+  = ([], TBool, n)
+inferPolyType' (Id str) env n
+  = ([], tryToLookUp str TErr env , n)
+inferPolyType' (Prim str) _ n
+  = ([], lookUp str primTypes, n)
+inferPolyType' (Fun f e) env n
+  | te == TErr = ([], TErr, n)
+  | otherwise  = (s, TFun tf' te, n')
+  where
+    a           = "a" ++ show n
+    tf          = TVar a
+    b           = (f, tf)
+    env'        = b : env
+    (s, te, n') = inferPolyType' e env' (n + 1)
+    tf'         = applySub s tf
+inferPolyType' (App f e) env n
+  = (combineSubs [su, se, sf], tb', ne)
+  where
+    (sf, tf, nf) = inferPolyType' f env n
+    env'         = updateTEnv env sf
+    (se, te, ne) = inferPolyType' e env' nf
+    a            = "a" ++ show n 
+    tb           = TVar a
+    msu          = unify tf (TFun te tb)
+    (su, tb')    = checkUni msu tb
+-- inferPolyType' (Cond p t f) env n
+--   = 
+--   where
+--     (sp, tp, np) = inferPolyType' p env n
+--     msp          = unify tp TBool
+--     (sb, tp')    = checkUni msp tp
+--     envp         = updateTEnvenv sp
+--     (st, tt, nt) = inferPolyType' t envp np
+--     envt         = updateTEnv envp st
+--     (sf, tf, nf) = inferPolyType' f envt nt
+--     msc          = unify tt tf
+--     (sc, tc)     = checkUni msc 
+
+
+
+checkUni :: Maybe Sub -> Type -> (Sub, Type)
+checkUni (Just s) t
+  = (s, applySub s t)
+checkUni Nothing t
+  = ([], TErr)
 
 ------------------------------------------------------
 -- Monomorphic type inference test cases from Table 1...
